@@ -1,97 +1,54 @@
 """
-Transform: cleans and standardizes raw Airbnb listings using Polars.
-Applies business rules, type casting, null handling, and derived columns.
+Transform: cleans and standardizes scraped Portal Inmobiliario listings using Polars.
 """
 import polars as pl
 from pathlib import Path
 
-# Columns we care about — drop everything else
-KEEP_COLS = [
-    "id", "name", "neighbourhood_cleansed", "latitude", "longitude",
-    "room_type", "accommodates", "bedrooms", "bathrooms_text",
-    "price", "minimum_nights", "maximum_nights",
-    "number_of_reviews", "review_scores_rating",
-    "availability_365", "instant_bookable",
-]
-
-
-def _parse_price(series: pl.Series) -> pl.Series:
-    """'$1,234.00' → 1234.0"""
-    return (
-        series
-        .str.replace_all(r"[\$,]", "")
-        .cast(pl.Float64, strict=False)
-    )
-
-
-def _parse_bathrooms(series: pl.Series) -> pl.Series:
-    """'1.5 baths' / 'Shared half-bath' → 1.5 / 0.5"""
-    cleaned = series.str.to_lowercase()
-    is_half = cleaned.str.contains("half")
-    num = cleaned.str.extract(r"(\d+\.?\d*)").cast(pl.Float64, strict=False)
-    return pl.when(is_half & num.is_null()).then(0.5).otherwise(num)
-
 
 def load_raw(path: Path) -> pl.DataFrame:
-    """Read the compressed CSV with only the columns we need."""
-    available = pl.read_csv(path, n_rows=0, infer_schema_length=0).columns
-    cols = [c for c in KEEP_COLS if c in available]
-    return pl.read_csv(path, columns=cols, infer_schema_length=500, ignore_errors=True)
+    return pl.read_csv(path, infer_schema_length=500, ignore_errors=True)
 
 
 def clean(df: pl.DataFrame) -> pl.DataFrame:
-    """Apply all transformation and business-rule steps."""
-
+    # Cast numeric columns
     df = df.with_columns([
-        # Price: parse string → float
-        _parse_price(pl.col("price")).alias("price_usd"),
-
-        # Bathrooms: parse text → float
-        _parse_bathrooms(pl.col("bathrooms_text")).alias("bathrooms"),
-
-        # Numeric casts
-        pl.col("bedrooms").cast(pl.Float64, strict=False),
-        pl.col("accommodates").cast(pl.Int32, strict=False),
-        pl.col("minimum_nights").cast(pl.Int32, strict=False),
-        pl.col("number_of_reviews").cast(pl.Int32, strict=False),
-        pl.col("review_scores_rating").cast(pl.Float64, strict=False),
-        pl.col("availability_365").cast(pl.Int32, strict=False),
-
-        # Boolean
-        (pl.col("instant_bookable").str.to_lowercase() == "t").alias("instant_bookable"),
-
-        # Neighbourhood: fill nulls, strip whitespace
-        pl.col("neighbourhood_cleansed").str.strip_chars().fill_null("Unknown"),
+        pl.col("price_clp").cast(pl.Float64, strict=False),
+        pl.col("bedrooms").cast(pl.Int32, strict=False),
+        pl.col("bathrooms").cast(pl.Int32, strict=False),
+        pl.col("sqm").cast(pl.Int32, strict=False),
+        pl.col("neighbourhood").str.strip_chars().fill_null("Unknown"),
+        pl.col("comuna").str.strip_chars().fill_null("Unknown"),
+        pl.col("title").str.strip_chars().fill_null(""),
+        pl.col("url").str.strip_chars().fill_null(""),
     ])
 
-    # Business rules: drop rows that violate data quality
+    # Business rules: drop invalid rows
     df = df.filter(
-        pl.col("price_usd").is_not_null() & (pl.col("price_usd") > 0) & (pl.col("price_usd") < 10_000)
-    ).filter(
-        pl.col("accommodates").is_not_null() & (pl.col("accommodates") > 0)
-    ).filter(
-        pl.col("latitude").is_not_null() & pl.col("longitude").is_not_null()
+        pl.col("price_clp").is_not_null() &
+        (pl.col("price_clp") > 50_000) &       # min CL$50.000/mes
+        (pl.col("price_clp") < 10_000_000)     # max CL$10M/mes
     )
 
     # Derived columns
     df = df.with_columns([
-        # Price per bedroom (handle 0 bedrooms as studio = 1)
-        (pl.col("price_usd") / pl.col("bedrooms").fill_null(1).clip(lower_bound=1))
-        .alias("price_per_bedroom"),
+        # Price per sqm
+        pl.when(pl.col("sqm").is_not_null() & (pl.col("sqm") > 0))
+          .then(pl.col("price_clp") / pl.col("sqm"))
+          .otherwise(None)
+          .alias("price_per_sqm"),
 
-        # Occupancy proxy: higher availability = less occupied
-        (1 - pl.col("availability_365") / 365).alias("occupancy_rate"),
+        # Price in UF approx (1 UF ≈ CL$38.000)
+        (pl.col("price_clp") / 38_000).round(2).alias("price_uf"),
 
-        # Rating category
-        pl.when(pl.col("review_scores_rating") >= 4.8).then(pl.lit("Excellent"))
-          .when(pl.col("review_scores_rating") >= 4.5).then(pl.lit("Very Good"))
-          .when(pl.col("review_scores_rating") >= 4.0).then(pl.lit("Good"))
-          .when(pl.col("review_scores_rating").is_not_null()).then(pl.lit("Below Average"))
-          .otherwise(pl.lit("No Rating"))
-          .alias("rating_category"),
+        # Budget category
+        pl.when(pl.col("price_clp") < 300_000).then(pl.lit("Económico"))
+          .when(pl.col("price_clp") < 600_000).then(pl.lit("Medio"))
+          .when(pl.col("price_clp") < 1_000_000).then(pl.lit("Premium"))
+          .otherwise(pl.lit("Lujo"))
+          .alias("budget_category"),
     ])
 
-    return df.drop(["bathrooms_text", "price"])
+    return df
 
 
 def save_parquet(df: pl.DataFrame, path: Path) -> None:
@@ -102,6 +59,6 @@ def save_parquet(df: pl.DataFrame, path: Path) -> None:
 
 if __name__ == "__main__":
     from pathlib import Path
-    raw = Path(__file__).parent.parent / "data" / "raw" / "listings_raw.csv.gz"
+    raw = Path(__file__).parent.parent / "data" / "raw" / "listings_raw.csv"
     df = clean(load_raw(raw))
     print(df.glimpse())

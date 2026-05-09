@@ -1,45 +1,47 @@
-# Real Estate ETL Pipeline
+# Real Estate ETL Pipeline + Dashboard
 
 ![Python](https://img.shields.io/badge/Python-3.9+-3776AB?style=flat&logo=python&logoColor=white)
 ![Polars](https://img.shields.io/badge/Polars-0.20+-CD792C?style=flat)
 ![DuckDB](https://img.shields.io/badge/DuckDB-0.10+-FFC832?style=flat)
+![Streamlit](https://img.shields.io/badge/Streamlit-1.35+-FF4B4B?style=flat&logo=streamlit)
 ![CI](https://img.shields.io/github/actions/workflow/status/Arcan17/real-estate-etl/ci.yml?label=CI&logo=github)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
 
-A Python ETL pipeline that extracts property listings data, cleans and standardizes it using **Polars**, loads it into a **DuckDB** analytical database, and generates market insights via SQL.
+A Python ETL pipeline that scrapes real property listings from **Portal Inmobiliario Chile**, cleans and standardizes the data with **Polars**, loads it into **DuckDB**, and visualizes market insights in an interactive **Streamlit** dashboard.
 
 ---
 
-## The problem it solves
+## What it does
 
-Real estate data comes from many fragmented sources — government registries, listing portals, open data APIs — each with inconsistent formats, currencies, null values, and naming conventions. This pipeline automates:
-
-- **Extraction** from any source (CSV, API, scraper output)
-- **Transformation**: type casting, business-rule validation, derived metrics
-- **Loading** into an analytical database for fast SQL queries
-- **Reporting**: market summary, price by neighbourhood/room type, value listings
+1. **Scrapes** live property listings from Portal Inmobiliario using [Scrapling](https://github.com/D4Vinci/Scrapling) — an adaptive scraping framework with anti-bot capabilities
+2. **Transforms** raw data with Polars: parses prices, bedrooms, m², computes UF price, budget category, price per m²
+3. **Loads** clean data into DuckDB for fast analytical SQL queries
+4. **Visualizes** market insights in a Streamlit dashboard with filters, charts, and clickable links to each property
 
 ---
 
 ## Pipeline
 
 ```
-Source data (CSV / API)
+Portal Inmobiliario (live scrape)
+        │  Scrapling — stealthy HTTP, adaptive selectors
+        ▼
+  extract.py    ← 5 pages × 48 listings = ~240 properties
         │
         ▼
-  extract.py      ← load raw listings into memory
+  transform.py  ← Polars: clean, validate, enrich
+        │  - parse price strings (CL$363.000 → 363000.0)
+        │  - parse bedrooms/bathrooms/sqm from text
+        │  - drop rows outside business rules
+        │  - add: price_uf, price_per_sqm, budget_category, url
+        ▼
+  load.py       ← DuckDB: schema + bulk insert
         │
         ▼
-  transform.py    ← Polars: clean, validate, enrich
-        │  - parse price strings ($1,234.00 → 1234.0)
-        │  - parse bathroom text ("1.5 baths" → 1.5)
-        │  - drop rows that violate business rules
-        │  - add: price_per_bedroom, occupancy_rate, rating_category
-        ▼
-  load.py         ← DuckDB: schema creation + bulk insert
+  analytics.py  ← SQL: avg by comuna, by bedrooms, budget distribution
         │
         ▼
-  analytics.py    ← SQL: market summary, rankings, value listings
+  dashboard.py  ← Streamlit: interactive filters + Plotly charts
 ```
 
 ---
@@ -47,27 +49,18 @@ Source data (CSV / API)
 ## Sample output
 
 ```
-── Market Summary ───────────────────────────────
-  Total listings        : 1,500
-  Neighbourhoods        : 15
-  Avg nightly price     : $49.93
-  Median nightly price  : $42.27
-  Avg occupancy         : 50.2%
-  Avg rating            : 4.6
-  Instant bookable      : 995
+── Market Summary — Arriendos Santiago ──────────
+  Total listings    : 237
+  Comunas           : 19
+  Precio promedio   : CL$363,214 (9.6 UF)
+  Precio mediano    : CL$341,000
+  Superficie prom.  : 37 m²
+  Rango precios     : CL$224,000 – CL$770,000
 
-── Avg Price by Neighbourhood (Top 10) ──────────
-  Vitacura                        $  92.47  (102 listings)
-  Las Condes                      $  71.64  (91 listings)
-  Lo Barnechea                    $  67.88  (109 listings)
-  Providencia                     $  64.58  (90 listings)
-  ...
-
-── Price & Occupancy by Room Type ───────────────
-  Entire home/apt            $  69.46  occ: 49.6%
-  Hotel room                 $  60.61  occ: 49.4%
-  Private room               $  31.31  occ: 51.9%
-  Shared room                $  16.70  occ: 49.3%
+── Precio por N° Dormitorios ─────────────────────
+  1 dorm.   CL$   325,701   31 m²
+  2 dorm.   CL$   417,323   46 m²
+  3 dorm.   CL$   558,125   69 m²
 ```
 
 ---
@@ -83,10 +76,14 @@ source .venv/bin/activate   # Windows: .venv\Scripts\activate
 
 pip install -r requirements.txt
 
+# Run the ETL pipeline (scrapes live data)
 python src/main.py
+
+# Launch the dashboard
+streamlit run dashboard.py
 ```
 
-To plug in your own data source, replace `extract.py` with your scraper or API client — `transform.py` and `load.py` are data-source agnostic.
+Open **http://localhost:8501** in your browser.
 
 ---
 
@@ -94,17 +91,7 @@ To plug in your own data source, replace `extract.py` with your scraper or API c
 
 ```bash
 pytest tests/ -v
-```
-
-```
-tests/test_transform.py::test_parse_price_standard PASSED
-tests/test_transform.py::test_parse_price_null_on_invalid PASSED
-tests/test_transform.py::test_parse_bathrooms_whole PASSED
-tests/test_transform.py::test_parse_bathrooms_half PASSED
-tests/test_transform.py::test_parse_bathrooms_decimal PASSED
-tests/test_transform.py::test_clean_returns_dataframe PASSED
-...
-16 passed in 0.08s
+# 16 passed
 ```
 
 ---
@@ -114,11 +101,12 @@ tests/test_transform.py::test_clean_returns_dataframe PASSED
 ```
 real-estate-etl/
 ├── src/
-│   ├── extract.py      # Data extraction (CSV / API / scraper)
+│   ├── extract.py      # Scrapling scraper — Portal Inmobiliario
 │   ├── transform.py    # Polars transformations and business rules
 │   ├── load.py         # DuckDB schema creation and bulk load
 │   ├── analytics.py    # SQL market analytics queries
 │   └── main.py         # Pipeline orchestrator
+├── dashboard.py        # Streamlit interactive dashboard
 ├── tests/
 │   └── test_transform.py   # 16 unit tests
 ├── requirements.txt
@@ -131,10 +119,11 @@ real-estate-etl/
 
 | Layer | Technology |
 |---|---|
+| Scraping | Scrapling 0.4+ (adaptive, anti-bot) |
 | Data transformation | Polars 0.20+ |
 | Analytical database | DuckDB 0.10+ |
-| HTTP client | httpx |
-| Columnar format | Apache Parquet (pyarrow) |
+| Dashboard | Streamlit + Plotly |
+| Columnar format | Apache Parquet |
 | Testing | pytest |
 | CI/CD | GitHub Actions |
 

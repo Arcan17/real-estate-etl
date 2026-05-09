@@ -1,123 +1,129 @@
 """
-Extract: generates realistic Airbnb-style listings data for Santiago, Chile.
-Simulates what a real scraper/API client would produce from sources like
-Inside Airbnb, Portal Inmobiliario, or government open data registries.
+Extract: scrapes real property listings from Portal Inmobiliario (Chile)
+using Scrapling — an adaptive scraping framework with anti-bot capabilities.
+
+Source: https://www.portalinmobiliario.com (public listings)
 """
+import time
 import random
-import numpy as np
 import polars as pl
 from pathlib import Path
+from scrapling.fetchers import Fetcher
 
 RAW_DIR = Path(__file__).parent.parent / "data" / "raw"
 RAW_FILE = RAW_DIR / "listings_raw.csv"
 
-NEIGHBOURHOODS = [
-    "Providencia", "Las Condes", "Ñuñoa", "Santiago Centro",
-    "Vitacura", "Miraflores", "La Reina", "San Miguel",
-    "Macul", "Lo Barnechea", "Peñalolén", "La Florida",
-    "Estación Central", "Recoleta", "Independencia",
-]
-
-ROOM_TYPES = [
-    "Entire home/apt", "Entire home/apt", "Entire home/apt",  # weighted higher
-    "Private room", "Private room",
-    "Shared room",
-    "Hotel room",
-]
-
-PRICE_BY_NEIGHBOURHOOD = {
-    "Vitacura": (120, 50), "Las Condes": (100, 40), "Lo Barnechea": (95, 35),
-    "Providencia": (85, 30), "La Reina": (80, 28), "Ñuñoa": (70, 25),
-    "Miraflores": (75, 25), "Santiago Centro": (60, 20), "San Miguel": (55, 18),
-    "La Florida": (50, 15), "Macul": (50, 15), "Peñalolén": (48, 14),
-    "Recoleta": (55, 18), "Independencia": (52, 16), "Estación Central": (45, 12),
-}
-
-PRICE_MULTIPLIER_BY_ROOM = {
-    "Entire home/apt": 1.0, "Hotel room": 0.9,
-    "Private room": 0.45, "Shared room": 0.25,
-}
-
-BATHROOM_OPTIONS = ["1 bath", "1 bath", "1.5 baths", "2 baths", "Shared half-bath"]
-
-NAMES = [
-    "Cozy {room} in {nbhd}", "Modern {room} near Parque Balmaceda",
-    "Bright {room} in the heart of {nbhd}", "Charming studio in {nbhd}",
-    "Stylish {room} with city views", "Comfortable {room} - great location",
-    "Brand new {room} in {nbhd}", "Spacious {room} close to metro",
-]
+BASE_URL = "https://www.portalinmobiliario.com/arriendo/departamento/santiago-metropolitana"
+MAX_PAGES = 5  # ~240 listings per run (48 per page)
 
 
-def generate_listings(n: int = 1500, seed: int = 42) -> pl.DataFrame:
-    """Generate n synthetic property listings for Santiago, Chile."""
-    random.seed(seed)
-    np.random.seed(seed)
+def _parse_card(card):
+    """Extract fields from a single listing card."""
+    try:
+        title = card.css_first('.poly-component__title')
+        price_el = card.css_first('.andes-money-amount__fraction')
+        location = card.css_first('.poly-component__location')
+        attrs = card.css('li')
 
-    rows = []
-    for i in range(1, n + 1):
-        nbhd = random.choice(NEIGHBOURHOODS)
-        room_type = random.choice(ROOM_TYPES)
-        mu, sigma = PRICE_BY_NEIGHBOURHOOD[nbhd]
-        base_price = max(10.0, np.random.normal(mu, sigma))
-        price = round(base_price * PRICE_MULTIPLIER_BY_ROOM[room_type], 2)
+        if not price_el:
+            return None
 
-        bedrooms = random.choice([1, 1, 1, 2, 2, 3, None])
-        if room_type in ("Shared room", "Private room"):
-            bedrooms = 1
+        price_raw = price_el.text.replace('.', '').replace(',', '').strip()
+        try:
+            price = float(price_raw)
+        except ValueError:
+            return None
 
-        rating = None
-        n_reviews = random.randint(0, 200)
-        if n_reviews >= 3:
-            rating = round(min(5.0, max(3.0, np.random.normal(4.6, 0.3))), 2)
+        # Parse location — "Street 123, Barrio, Comuna"
+        loc_text = location.text.strip() if location else ""
+        loc_parts = [p.strip() for p in loc_text.split(',')]
+        neighbourhood = loc_parts[1] if len(loc_parts) > 1 else ""
+        comuna = loc_parts[2] if len(loc_parts) > 2 else ""
 
-        name_tpl = random.choice(NAMES)
-        name = name_tpl.format(
-            room="apartment" if room_type == "Entire home/apt" else "room",
-            nbhd=nbhd,
-        )
+        # Parse attributes list: bedrooms, bathrooms, sqm
+        bedrooms = bathrooms = sqm = None
+        for attr in attrs:
+            t = attr.text.lower()
+            if 'dormitorio' in t or 'dorm' in t:
+                # "2 dormitorios" or "1 a 2 dormitorios" → take first number
+                import re
+                nums = re.findall(r'\d+', t)
+                if nums:
+                    bedrooms = int(nums[0])
+            elif 'baño' in t or 'bath' in t:
+                import re
+                nums = re.findall(r'\d+', t)
+                if nums:
+                    bathrooms = int(nums[0])
+            elif 'm²' in t or 'm2' in t:
+                import re
+                nums = re.findall(r'\d+', t)
+                if nums:
+                    sqm = int(nums[0])
 
-        # Santiago coordinates with small jitter per neighbourhood
-        lat_base = -33.45 + NEIGHBOURHOODS.index(nbhd) * 0.01
-        lon_base = -70.65 + NEIGHBOURHOODS.index(nbhd) * 0.01
-        lat = lat_base + np.random.uniform(-0.02, 0.02)
-        lon = lon_base + np.random.uniform(-0.02, 0.02)
+        # URL — clean tracking params
+        link = card.css_first('a')
+        url = link.attrib.get('href', '').split('#')[0] if link else ""
+        if url and not url.startswith('http'):
+            url = 'https://' + url.lstrip('/')
 
-        rows.append({
-            "id": i,
-            "name": name,
-            "neighbourhood_cleansed": nbhd,
-            "latitude": round(lat, 6),
-            "longitude": round(lon, 6),
-            "room_type": room_type,
-            "accommodates": str(random.randint(1, 8)),
-            "bedrooms": str(bedrooms) if bedrooms else None,
-            "bathrooms_text": random.choice(BATHROOM_OPTIONS),
-            "price": f"${price:,.2f}",
-            "minimum_nights": str(random.choice([1, 1, 2, 3, 7])),
-            "maximum_nights": str(random.choice([30, 60, 90, 365])),
-            "number_of_reviews": str(n_reviews),
-            "review_scores_rating": str(rating) if rating else None,
-            "availability_365": str(random.randint(0, 365)),
-            "instant_bookable": random.choice(["t", "t", "f"]),
-        })
-
-    return pl.DataFrame(rows)
+        return {
+            "title": title.text.strip() if title else "",
+            "price_clp": price,
+            "neighbourhood": neighbourhood,
+            "comuna": comuna,
+            "bedrooms": bedrooms,
+            "bathrooms": bathrooms,
+            "sqm": sqm,
+            "location_full": loc_text,
+            "url": url,
+        }
+    except Exception:
+        return None
 
 
-def download_data(dest: Path = RAW_FILE, force: bool = False, n: int = 1500) -> Path:
-    """Generate synthetic listings and save as compressed CSV."""
+def scrape_page(url: str) -> list[dict]:
+    """Scrape one page of listings."""
+    page = Fetcher.get(url, stealthy_headers=True)
+    cards = page.css('.ui-search-result__wrapper')
+    results = []
+    for card in cards:
+        row = _parse_card(card)
+        if row:
+            results.append(row)
+    return results
+
+
+def scrape(max_pages: int = MAX_PAGES, force: bool = False) -> pl.DataFrame:
+    """Scrape multiple pages and return a Polars DataFrame."""
     RAW_DIR.mkdir(parents=True, exist_ok=True)
 
-    if dest.exists() and not force:
-        print(f"  Already exists: {dest.name} ({dest.stat().st_size / 1024:.0f} KB)")
-        return dest
+    if RAW_FILE.exists() and not force:
+        print(f"  Already exists: {RAW_FILE.name} — loading from cache")
+        return pl.read_csv(RAW_FILE)
 
-    print(f"  Generating {n:,} synthetic listings for Santiago, Chile...")
-    df = generate_listings(n=n)
-    df.write_csv(dest)
-    print(f"  Saved: {dest.name} ({dest.stat().st_size / 1024:.0f} KB, {len(df):,} rows)")
+    all_rows = []
+    for page_num in range(max_pages):
+        offset = page_num * 48
+        url = f"{BASE_URL}_Desde_{offset + 1}" if offset > 0 else BASE_URL
+        print(f"  Scraping page {page_num + 1}/{max_pages} ({len(all_rows)} listings so far)...")
+        rows = scrape_page(url)
+        all_rows.extend(rows)
+        if page_num < max_pages - 1:
+            time.sleep(random.uniform(1.5, 3.0))  # polite delay
+
+    df = pl.DataFrame(all_rows)
+    df.write_csv(RAW_FILE)
+    print(f"  Saved: {RAW_FILE.name} ({len(df):,} rows)")
+    return df
+
+
+def download_data(dest: Path = RAW_FILE, force: bool = False, **kwargs) -> Path:
+    """Compatibility wrapper for main.py."""
+    scrape(force=force)
     return dest
 
 
 if __name__ == "__main__":
-    download_data(force=True)
+    df = scrape(force=True)
+    print(df.head(10))
