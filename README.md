@@ -9,6 +9,8 @@
 
 A Python ETL pipeline that scrapes real property listings from **Portal Inmobiliario Chile**, cleans and standardizes the data with **Polars**, loads it into **DuckDB**, and visualizes market insights in an interactive **Streamlit** dashboard.
 
+![Dashboard](docs/screenshots/dashboard.png)
+
 ---
 
 ## What it does
@@ -91,7 +93,7 @@ Open **http://localhost:8501** in your browser.
 
 ```bash
 pytest tests/ -v
-# 16 passed
+# 19 passed
 ```
 
 ---
@@ -108,7 +110,7 @@ real-estate-etl/
 │   └── main.py         # Pipeline orchestrator
 ├── dashboard.py        # Streamlit interactive dashboard
 ├── tests/
-│   └── test_transform.py   # 16 unit tests
+│   └── test_transform.py   # 19 unit tests
 ├── requirements.txt
 └── .github/workflows/ci.yml
 ```
