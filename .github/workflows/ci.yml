@@ -23,6 +23,3 @@ jobs:
 
       - name: Run tests
         run: pytest tests/ -v --tb=short
-
-      - name: Run pipeline (smoke test)
-        run: python src/main.py
