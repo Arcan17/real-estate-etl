@@ -2,8 +2,10 @@
 Streamlit dashboard for Real Estate ETL Pipeline — Santiago, Chile.
 Run: streamlit run dashboard.py
 """
+
 import sys
 import os
+
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import streamlit as st
@@ -21,6 +23,7 @@ st.set_page_config(
     page_icon="🏢",
     layout="wide",
 )
+
 
 # ── Load data ─────────────────────────────────────────────────────────────────
 @st.cache_resource
@@ -63,8 +66,7 @@ selected_bedrooms = st.sidebar.selectbox("Dormitorios", bedrooms_options)
 
 # Apply filters
 filtered = df.filter(
-    (pl.col("price_clp") >= price_range[0]) &
-    (pl.col("price_clp") <= price_range[1])
+    (pl.col("price_clp") >= price_range[0]) & (pl.col("price_clp") <= price_range[1])
 )
 if selected_comuna != "Todas":
     filtered = filtered.filter(pl.col("comuna") == selected_comuna)
@@ -81,9 +83,9 @@ if len(filtered) == 0:
     st.warning("No hay listings con los filtros seleccionados. Ajusta los filtros.")
     st.stop()
 
-avg_price = filtered['price_clp'].mean()
-median_price = filtered['price_clp'].median()
-avg_sqm = filtered['sqm'].drop_nulls().mean()
+avg_price = filtered["price_clp"].mean()
+median_price = filtered["price_clp"].median()
+avg_sqm = filtered["sqm"].drop_nulls().mean()
 
 col1.metric("Total listings", f"{len(filtered):,}")
 col2.metric("Precio promedio", f"CL${avg_price:,.0f}" if avg_price else "—")
@@ -99,25 +101,29 @@ col_left, col_right = st.columns(2)
 with col_left:
     st.subheader("📍 Precio promedio por Comuna")
     by_comuna = (
-        filtered
-        .filter(pl.col("comuna").is_not_null() & (pl.col("comuna") != ""))
+        filtered.filter(pl.col("comuna").is_not_null() & (pl.col("comuna") != ""))
         .group_by("comuna")
-        .agg([
-            pl.count("price_clp").alias("total"),
-            pl.mean("price_clp").alias("avg_price"),
-        ])
+        .agg(
+            [
+                pl.count("price_clp").alias("total"),
+                pl.mean("price_clp").alias("avg_price"),
+            ]
+        )
         .filter(pl.col("total") >= 2)
         .sort("avg_price", descending=True)
         .head(12)
     )
     fig = px.bar(
         by_comuna.to_pandas(),
-        x="avg_price", y="comuna",
+        x="avg_price",
+        y="comuna",
         orientation="h",
         color="avg_price",
         color_continuous_scale="Teal",
         labels={"avg_price": "Precio Promedio (CL$)", "comuna": ""},
-        text=by_comuna["avg_price"].map_elements(lambda x: f"${x:,.0f}", return_dtype=pl.String).to_list(),
+        text=by_comuna["avg_price"]
+        .map_elements(lambda x: f"${x:,.0f}", return_dtype=pl.String)
+        .to_list(),
     )
     fig.update_layout(
         coloraxis_showscale=False,
@@ -131,23 +137,27 @@ with col_left:
 with col_right:
     st.subheader("🛏️ Precio por N° Dormitorios")
     by_bed = (
-        filtered
-        .filter(pl.col("bedrooms").is_not_null() & pl.col("bedrooms").is_between(1, 5))
+        filtered.filter(pl.col("bedrooms").is_not_null() & pl.col("bedrooms").is_between(1, 5))
         .group_by("bedrooms")
-        .agg([
-            pl.count("price_clp").alias("total"),
-            pl.mean("price_clp").alias("avg_price"),
-            pl.mean("sqm").alias("avg_sqm"),
-        ])
+        .agg(
+            [
+                pl.count("price_clp").alias("total"),
+                pl.mean("price_clp").alias("avg_price"),
+                pl.mean("sqm").alias("avg_sqm"),
+            ]
+        )
         .sort("bedrooms")
     )
     fig2 = px.bar(
         by_bed.to_pandas(),
-        x="bedrooms", y="avg_price",
+        x="bedrooms",
+        y="avg_price",
         color="avg_price",
         color_continuous_scale="Teal",
         labels={"bedrooms": "Dormitorios", "avg_price": "Precio Promedio (CL$)"},
-        text=by_bed["avg_price"].map_elements(lambda x: f"${x:,.0f}", return_dtype=pl.String).to_list(),
+        text=by_bed["avg_price"]
+        .map_elements(lambda x: f"${x:,.0f}", return_dtype=pl.String)
+        .to_list(),
     )
     fig2.update_layout(
         coloraxis_showscale=False,
@@ -175,8 +185,7 @@ with col_left2:
 with col_right2:
     st.subheader("🏷️ Distribución por Presupuesto")
     by_budget = (
-        filtered
-        .group_by("budget_category")
+        filtered.group_by("budget_category")
         .agg(pl.count("price_clp").alias("total"))
         .sort("total", descending=True)
     )
@@ -195,15 +204,32 @@ st.divider()
 st.subheader(f"📋 Listings ({len(filtered):,} resultados)")
 
 display_df = (
-    filtered
-    .select(["title", "comuna", "bedrooms", "bathrooms", "sqm", "price_clp", "price_uf", "budget_category", "url"])
-    .rename({
-        "title": "Título", "comuna": "Comuna",
-        "bedrooms": "Dorm.", "bathrooms": "Baños",
-        "sqm": "m²", "price_clp": "Precio (CL$)",
-        "price_uf": "Precio (UF)", "budget_category": "Categoría",
-        "url": "Link",
-    })
+    filtered.select(
+        [
+            "title",
+            "comuna",
+            "bedrooms",
+            "bathrooms",
+            "sqm",
+            "price_clp",
+            "price_uf",
+            "budget_category",
+            "url",
+        ]
+    )
+    .rename(
+        {
+            "title": "Título",
+            "comuna": "Comuna",
+            "bedrooms": "Dorm.",
+            "bathrooms": "Baños",
+            "sqm": "m²",
+            "price_clp": "Precio (CL$)",
+            "price_uf": "Precio (UF)",
+            "budget_category": "Categoría",
+            "url": "Link",
+        }
+    )
     .sort("Precio (CL$)")
 )
 
@@ -218,7 +244,7 @@ st.dataframe(
             "Link",
             display_text="Ver en Portal Inmobiliario",
         ),
-    }
+    },
 )
 
 # ── Export buttons ────────────────────────────────────────────────────────────
@@ -237,6 +263,7 @@ with col_csv:
 
 with col_xlsx:
     import io
+
     xlsx_buffer = io.BytesIO()
     display_df.to_pandas().to_excel(xlsx_buffer, index=False, sheet_name="Listings")
     xlsx_buffer.seek(0)

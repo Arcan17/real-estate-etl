@@ -1,12 +1,15 @@
 """
 Analytics: SQL queries on DuckDB to extract market insights from real listings.
 """
+
 import duckdb
 import polars as pl
 
 
 def avg_price_by_comuna(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
-    return pl.from_arrow(con.execute("""
+    return pl.from_arrow(
+        con.execute(
+            """
         SELECT
             comuna,
             COUNT(*)                        AS total,
@@ -19,11 +22,15 @@ def avg_price_by_comuna(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
         HAVING COUNT(*) >= 3
         ORDER BY avg_price_clp DESC
         LIMIT 15
-    """).arrow())
+    """
+        ).arrow()
+    )
 
 
 def price_by_bedrooms(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
-    return pl.from_arrow(con.execute("""
+    return pl.from_arrow(
+        con.execute(
+            """
         SELECT
             bedrooms,
             COUNT(*)                    AS total,
@@ -34,11 +41,15 @@ def price_by_bedrooms(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
         WHERE bedrooms IS NOT NULL AND bedrooms BETWEEN 1 AND 5
         GROUP BY bedrooms
         ORDER BY bedrooms
-    """).arrow())
+    """
+        ).arrow()
+    )
 
 
 def budget_distribution(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
-    return pl.from_arrow(con.execute("""
+    return pl.from_arrow(
+        con.execute(
+            """
         SELECT
             budget_category,
             COUNT(*)                                        AS total,
@@ -46,11 +57,14 @@ def budget_distribution(con: duckdb.DuckDBPyConnection) -> pl.DataFrame:
         FROM listings
         GROUP BY budget_category
         ORDER BY MIN(price_clp)
-    """).arrow())
+    """
+        ).arrow()
+    )
 
 
 def market_summary(con: duckdb.DuckDBPyConnection) -> dict:
-    row = con.execute("""
+    row = con.execute(
+        """
         SELECT
             COUNT(*)                        AS total_listings,
             COUNT(DISTINCT comuna)          AS total_comunas,
@@ -61,9 +75,18 @@ def market_summary(con: duckdb.DuckDBPyConnection) -> dict:
             MIN(price_clp)                  AS min_price_clp,
             MAX(price_clp)                  AS max_price_clp
         FROM listings
-    """).fetchone()
-    keys = ["total_listings", "total_comunas", "avg_price_clp", "median_price_clp",
-            "avg_price_uf", "avg_sqm", "min_price_clp", "max_price_clp"]
+    """
+    ).fetchone()
+    keys = [
+        "total_listings",
+        "total_comunas",
+        "avg_price_clp",
+        "median_price_clp",
+        "avg_price_uf",
+        "avg_sqm",
+        "min_price_clp",
+        "max_price_clp",
+    ]
     return dict(zip(keys, row))
 
 
@@ -83,7 +106,9 @@ def print_report(con: duckdb.DuckDBPyConnection) -> None:
 
     print("\n── Precio por N° Dormitorios ─────────────────────")
     for row in price_by_bedrooms(con).iter_rows(named=True):
-        print(f"  {row['bedrooms']} dorm.   CL${row['avg_price_clp']:>10,.0f}   {row['avg_sqm']} m²")
+        print(
+            f"  {row['bedrooms']} dorm.   CL${row['avg_price_clp']:>10,.0f}   {row['avg_sqm']} m²"
+        )
 
     print("\n── Distribución por Presupuesto ─────────────────")
     for row in budget_distribution(con).iter_rows(named=True):

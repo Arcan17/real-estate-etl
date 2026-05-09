@@ -1,6 +1,7 @@
 """
 Load: inserts the cleaned Polars DataFrame into a DuckDB analytical database.
 """
+
 import duckdb
 import polars as pl
 from pathlib import Path
@@ -15,7 +16,8 @@ def get_connection(db_path: Path = DB_PATH) -> duckdb.DuckDBPyConnection:
 
 def create_schema(con: duckdb.DuckDBPyConnection) -> None:
     con.execute("DROP TABLE IF EXISTS listings")
-    con.execute("""
+    con.execute(
+        """
         CREATE TABLE listings (
             title           VARCHAR,
             price_clp       DOUBLE,
@@ -30,7 +32,8 @@ def create_schema(con: duckdb.DuckDBPyConnection) -> None:
             price_uf        DOUBLE,
             budget_category VARCHAR
         )
-    """)
+    """
+    )
 
 
 def load(df: pl.DataFrame, con: duckdb.DuckDBPyConnection) -> int:

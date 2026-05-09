@@ -4,6 +4,7 @@ using Scrapling — an adaptive scraping framework with anti-bot capabilities.
 
 Source: https://www.portalinmobiliario.com (public listings)
 """
+
 import time
 import random
 import polars as pl
@@ -20,15 +21,15 @@ MAX_PAGES = 5  # ~240 listings per run (48 per page)
 def _parse_card(card):
     """Extract fields from a single listing card."""
     try:
-        title = card.css_first('.poly-component__title')
-        price_el = card.css_first('.andes-money-amount__fraction')
-        location = card.css_first('.poly-component__location')
-        attrs = card.css('li')
+        title = card.css_first(".poly-component__title")
+        price_el = card.css_first(".andes-money-amount__fraction")
+        location = card.css_first(".poly-component__location")
+        attrs = card.css("li")
 
         if not price_el:
             return None
 
-        price_raw = price_el.text.replace('.', '').replace(',', '').strip()
+        price_raw = price_el.text.replace(".", "").replace(",", "").strip()
         try:
             price = float(price_raw)
         except ValueError:
@@ -36,7 +37,7 @@ def _parse_card(card):
 
         # Parse location — "Street 123, Barrio, Comuna"
         loc_text = location.text.strip() if location else ""
-        loc_parts = [p.strip() for p in loc_text.split(',')]
+        loc_parts = [p.strip() for p in loc_text.split(",")]
         neighbourhood = loc_parts[1] if len(loc_parts) > 1 else ""
         comuna = loc_parts[2] if len(loc_parts) > 2 else ""
 
@@ -44,28 +45,31 @@ def _parse_card(card):
         bedrooms = bathrooms = sqm = None
         for attr in attrs:
             t = attr.text.lower()
-            if 'dormitorio' in t or 'dorm' in t:
+            if "dormitorio" in t or "dorm" in t:
                 # "2 dormitorios" or "1 a 2 dormitorios" → take first number
                 import re
-                nums = re.findall(r'\d+', t)
+
+                nums = re.findall(r"\d+", t)
                 if nums:
                     bedrooms = int(nums[0])
-            elif 'baño' in t or 'bath' in t:
+            elif "baño" in t or "bath" in t:
                 import re
-                nums = re.findall(r'\d+', t)
+
+                nums = re.findall(r"\d+", t)
                 if nums:
                     bathrooms = int(nums[0])
-            elif 'm²' in t or 'm2' in t:
+            elif "m²" in t or "m2" in t:
                 import re
-                nums = re.findall(r'\d+', t)
+
+                nums = re.findall(r"\d+", t)
                 if nums:
                     sqm = int(nums[0])
 
         # URL — clean tracking params
-        link = card.css_first('a')
-        url = link.attrib.get('href', '').split('#')[0] if link else ""
-        if url and not url.startswith('http'):
-            url = 'https://' + url.lstrip('/')
+        link = card.css_first("a")
+        url = link.attrib.get("href", "").split("#")[0] if link else ""
+        if url and not url.startswith("http"):
+            url = "https://" + url.lstrip("/")
 
         return {
             "title": title.text.strip() if title else "",
@@ -85,7 +89,7 @@ def _parse_card(card):
 def scrape_page(url: str) -> list[dict]:
     """Scrape one page of listings."""
     page = Fetcher.get(url, stealthy_headers=True)
-    cards = page.css('.ui-search-result__wrapper')
+    cards = page.css(".ui-search-result__wrapper")
     results = []
     for card in cards:
         row = _parse_card(card)

@@ -2,6 +2,7 @@
 FastAPI REST API for the Real Estate ETL Pipeline.
 Run: uvicorn src.api:app --reload
 """
+
 import io
 import sys
 import os
@@ -38,6 +39,7 @@ def _get_df() -> pl.DataFrame:
 
 
 # ── Endpoints ─────────────────────────────────────────────────────────────────
+
 
 @app.get("/api/health")
 def health():
@@ -91,11 +93,13 @@ def get_comunas():
     result = (
         df.filter(pl.col("comuna").is_not_null())
         .group_by("comuna")
-        .agg([
-            pl.count("price_clp").alias("total"),
-            pl.mean("price_clp").alias("avg_price_clp"),
-            pl.mean("sqm").alias("avg_sqm"),
-        ])
+        .agg(
+            [
+                pl.count("price_clp").alias("total"),
+                pl.mean("price_clp").alias("avg_price_clp"),
+                pl.mean("sqm").alias("avg_sqm"),
+            ]
+        )
         .sort("avg_price_clp", descending=True)
     )
     return result.to_dicts()
@@ -122,11 +126,13 @@ def prices_by_bedrooms():
     result = (
         df.filter(pl.col("bedrooms").is_not_null() & pl.col("bedrooms").is_between(1, 5))
         .group_by("bedrooms")
-        .agg([
-            pl.mean("price_clp").alias("avg_price_clp"),
-            pl.mean("sqm").alias("avg_sqm"),
-            pl.count("price_clp").alias("total"),
-        ])
+        .agg(
+            [
+                pl.mean("price_clp").alias("avg_price_clp"),
+                pl.mean("sqm").alias("avg_sqm"),
+                pl.count("price_clp").alias("total"),
+            ]
+        )
         .sort("bedrooms")
     )
     return result.to_dicts()

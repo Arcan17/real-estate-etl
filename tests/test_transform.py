@@ -1,6 +1,7 @@
 """
 Unit tests for the transform module — Portal Inmobiliario ETL.
 """
+
 import sys
 import os
 import pytest
@@ -14,21 +15,22 @@ from transform import clean
 def make_df(**overrides) -> pl.DataFrame:
     """Create a minimal valid listings DataFrame for testing."""
     base = {
-        "title":        ["Depto 1 dorm Providencia", "Loft Santiago Centro", "Depto 3 dorm Las Condes"],
-        "price_clp":    ["363000", "280000", "650000"],
-        "neighbourhood":["Providencia", "Santiago", "Las Condes"],
-        "comuna":       ["Providencia", "Santiago", "Las Condes"],
-        "bedrooms":     ["1", "1", "3"],
-        "bathrooms":    ["1", "1", "2"],
-        "sqm":          ["35", "28", "75"],
-        "location_full":["Providencia, Santiago", "Santiago Centro", "Las Condes, Santiago"],
-        "url":          ["https://portal.com/1", "https://portal.com/2", "https://portal.com/3"],
+        "title": ["Depto 1 dorm Providencia", "Loft Santiago Centro", "Depto 3 dorm Las Condes"],
+        "price_clp": ["363000", "280000", "650000"],
+        "neighbourhood": ["Providencia", "Santiago", "Las Condes"],
+        "comuna": ["Providencia", "Santiago", "Las Condes"],
+        "bedrooms": ["1", "1", "3"],
+        "bathrooms": ["1", "1", "2"],
+        "sqm": ["35", "28", "75"],
+        "location_full": ["Providencia, Santiago", "Santiago Centro", "Las Condes, Santiago"],
+        "url": ["https://portal.com/1", "https://portal.com/2", "https://portal.com/3"],
     }
     base.update(overrides)
     return pl.DataFrame(base)
 
 
 # ── clean() — basic contract ──────────────────────────────────────────────────
+
 
 def test_clean_returns_dataframe():
     result = clean(make_df())
@@ -57,6 +59,7 @@ def test_clean_casts_sqm_to_int():
 
 # ── Business rules — price filtering ─────────────────────────────────────────
 
+
 def test_clean_drops_price_below_minimum():
     df = make_df(price_clp=["30000", "363000", "500000"])  # 30k < 50k threshold
     result = clean(df)
@@ -83,6 +86,7 @@ def test_clean_keeps_valid_prices():
 
 
 # ── Derived columns ───────────────────────────────────────────────────────────
+
 
 def test_clean_adds_price_uf():
     result = clean(make_df())
@@ -113,6 +117,7 @@ def test_clean_adds_budget_category():
 
 # ── Budget category thresholds ────────────────────────────────────────────────
 
+
 def test_budget_economico_below_300k():
     df = make_df(price_clp=["250000", "363000", "650000"])
     result = clean(df)
@@ -138,6 +143,7 @@ def test_budget_lujo_above_1m():
 
 
 # ── Null handling ─────────────────────────────────────────────────────────────
+
 
 def test_clean_fills_null_comuna():
     df = make_df(comuna=["Providencia", None, "Las Condes"])

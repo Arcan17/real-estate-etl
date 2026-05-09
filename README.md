@@ -109,6 +109,8 @@ Open **http://localhost:8501** in your browser.
 
 ## REST API
 
+![API Docs](docs/screenshots/api-docs.png)
+
 Start the API server:
 
 ```bash
@@ -187,7 +189,7 @@ real-estate-etl/
 ├── dashboard.py        # Streamlit interactive dashboard (+ CSV/Excel export)
 ├── tests/
 │   ├── test_transform.py   # 19 ETL unit tests
-│   └── test_api.py         # 13 API endpoint tests
+│   └── test_api.py         # 26 API endpoint tests
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt
@@ -208,7 +210,7 @@ real-estate-etl/
 | Export | CSV + Excel (openpyxl) |
 | Columnar format | Apache Parquet |
 | Containerization | Docker + Docker Compose |
-| Testing | pytest (19 tests) |
+| Testing | pytest (45 tests: 19 ETL + 26 API) |
 | CI/CD | GitHub Actions |
 
 ---
