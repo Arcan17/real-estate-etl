@@ -19,7 +19,7 @@ PROCESSED_FILE = Path(__file__).parent.parent / "data" / "processed" / "listings
 def main():
     print("=" * 52)
     print("  Real Estate ETL Pipeline — Santiago, Chile")
-    print("  Source: Inside Airbnb (insideairbnb.com)")
+    print("  Source: Portal Inmobiliario Chile (portalinmobiliario.com)")
     print("=" * 52)
 
     # 1. Extract

@@ -220,3 +220,29 @@ st.dataframe(
         ),
     }
 )
+
+# ── Export buttons ────────────────────────────────────────────────────────────
+st.divider()
+st.subheader("⬇️ Exportar datos")
+col_csv, col_xlsx, _ = st.columns([1, 1, 3])
+
+with col_csv:
+    csv_bytes = display_df.write_csv().encode("utf-8")
+    st.download_button(
+        label="📄 Descargar CSV",
+        data=csv_bytes,
+        file_name="listings_santiago.csv",
+        mime="text/csv",
+    )
+
+with col_xlsx:
+    import io
+    xlsx_buffer = io.BytesIO()
+    display_df.to_pandas().to_excel(xlsx_buffer, index=False, sheet_name="Listings")
+    xlsx_buffer.seek(0)
+    st.download_button(
+        label="📊 Descargar Excel",
+        data=xlsx_buffer.getvalue(),
+        file_name="listings_santiago.xlsx",
+        mime="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    )

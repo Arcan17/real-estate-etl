@@ -7,7 +7,9 @@
 ![CI](https://img.shields.io/github/actions/workflow/status/Arcan17/real-estate-etl/ci.yml?label=CI&logo=github)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
 
-A Python ETL pipeline that scrapes real property listings from **Portal Inmobiliario Chile**, cleans and standardizes the data with **Polars**, loads it into **DuckDB**, and visualizes market insights in an interactive **Streamlit** dashboard.
+Python ETL project that scrapes real estate listings from **Portal Inmobiliario Chile**, cleans and enriches the data with **Polars**, stores it in **DuckDB**, exposes analytics through SQL and a **Streamlit dashboard**, and serves a **FastAPI REST API** with CSV/Excel export.
+
+**Useful for:** real estate market analysis · web scraping automation · ETL/data engineering portfolio · dashboard and reporting automation · price tracking and market intelligence
 
 ![Dashboard](docs/screenshots/dashboard.png)
 
@@ -19,6 +21,8 @@ A Python ETL pipeline that scrapes real property listings from **Portal Inmobili
 2. **Transforms** raw data with Polars: parses prices, bedrooms, m², computes UF price, budget category, price per m²
 3. **Loads** clean data into DuckDB for fast analytical SQL queries
 4. **Visualizes** market insights in a Streamlit dashboard with filters, charts, and clickable links to each property
+5. **Exports** data as CSV or Excel directly from the dashboard download buttons
+6. **Serves** a FastAPI REST API with endpoints for listings, summary stats, and CSV export
 
 ---
 
@@ -89,6 +93,45 @@ Open **http://localhost:8501** in your browser.
 
 ---
 
+## REST API
+
+Start the API server:
+
+```bash
+uvicorn src.api:app --reload
+# Docs at http://localhost:8000/docs
+```
+
+| Method | Endpoint | Description |
+|---|---|---|
+| `GET` | `/api/health` | Health check |
+| `GET` | `/api/listings` | Paginated listings with filters |
+| `GET` | `/api/summary` | Market summary stats |
+| `GET` | `/api/comunas` | All comunas with avg price |
+| `GET` | `/api/prices/by-comuna` | Avg price per commune |
+| `GET` | `/api/prices/by-bedrooms` | Avg price by bedroom count |
+| `GET` | `/api/export/csv` | Download all listings as CSV |
+
+```bash
+# Examples
+curl "http://localhost:8000/api/summary"
+curl "http://localhost:8000/api/listings?comuna=Providencia&bedrooms=2"
+curl "http://localhost:8000/api/export/csv" -o listings.csv
+```
+
+## Docker
+
+```bash
+# Run the dashboard
+docker compose up dashboard
+
+# Run the ETL pipeline
+docker compose run pipeline
+
+# Run the API
+docker compose up api --profile api
+```
+
 ## Running tests
 
 ```bash
@@ -107,10 +150,13 @@ real-estate-etl/
 │   ├── transform.py    # Polars transformations and business rules
 │   ├── load.py         # DuckDB schema creation and bulk load
 │   ├── analytics.py    # SQL market analytics queries
-│   └── main.py         # Pipeline orchestrator
-├── dashboard.py        # Streamlit interactive dashboard
+│   ├── main.py         # Pipeline orchestrator
+│   └── api.py          # FastAPI REST API
+├── dashboard.py        # Streamlit interactive dashboard (+ CSV/Excel export)
 ├── tests/
 │   └── test_transform.py   # 19 unit tests
+├── Dockerfile
+├── docker-compose.yml
 ├── requirements.txt
 └── .github/workflows/ci.yml
 ```
@@ -125,8 +171,11 @@ real-estate-etl/
 | Data transformation | Polars 0.20+ |
 | Analytical database | DuckDB 0.10+ |
 | Dashboard | Streamlit + Plotly |
+| REST API | FastAPI + Uvicorn |
+| Export | CSV + Excel (openpyxl) |
 | Columnar format | Apache Parquet |
-| Testing | pytest |
+| Containerization | Docker + Docker Compose |
+| Testing | pytest (19 tests) |
 | CI/CD | GitHub Actions |
 
 ---
