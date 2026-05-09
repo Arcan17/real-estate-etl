@@ -11,6 +11,20 @@ Python ETL project that scrapes real estate listings from **Portal Inmobiliario 
 
 **Useful for:** real estate market analysis · web scraping automation · ETL/data engineering portfolio · dashboard and reporting automation · price tracking and market intelligence
 
+---
+
+## Client use cases
+
+| Goal | How this project delivers |
+|---|---|
+| Scrape a website and clean the data | `extract.py` + `transform.py` — live scraping with Polars ETL |
+| Store results in a fast analytical database | DuckDB bulk load with typed schema |
+| Build a dashboard with filters and charts | Streamlit + Plotly with sidebar filters |
+| Deliver data as CSV / Excel | One-click export from dashboard and REST API |
+| Expose data via a REST API | FastAPI with pagination, filters, and file export |
+| Run everything in a reproducible environment | Docker Compose — pipeline, dashboard, and API services |
+| Automate and schedule the pipeline | `python src/main.py` — ready for cron or Airflow |
+
 ![Dashboard](docs/screenshots/dashboard.png)
 
 ---
@@ -111,32 +125,50 @@ uvicorn src.api:app --reload
 | `GET` | `/api/prices/by-comuna` | Avg price per commune |
 | `GET` | `/api/prices/by-bedrooms` | Avg price by bedroom count |
 | `GET` | `/api/export/csv` | Download all listings as CSV |
+| `GET` | `/api/export/excel` | Download all listings as Excel (.xlsx) |
 
 ```bash
 # Examples
 curl "http://localhost:8000/api/summary"
 curl "http://localhost:8000/api/listings?comuna=Providencia&bedrooms=2"
 curl "http://localhost:8000/api/export/csv" -o listings.csv
+curl "http://localhost:8000/api/export/excel" -o listings.xlsx
 ```
+
+<details>
+<summary>Sample JSON response — <code>/api/summary</code></summary>
+
+```json
+{
+  "total_listings": 237,
+  "comunas": 19,
+  "avg_price_clp": 363214,
+  "median_price_clp": 341000,
+  "avg_sqm": 37.2,
+  "min_price_clp": 224000,
+  "max_price_clp": 770000
+}
+```
+</details>
 
 ## Docker
 
 ```bash
-# Run the dashboard
+# 1. Run the ETL pipeline first (generates data/listings.duckdb)
+docker compose --profile pipeline run pipeline
+
+# 2. Launch the Streamlit dashboard
 docker compose up dashboard
 
-# Run the ETL pipeline
-docker compose run pipeline
-
-# Run the API
-docker compose up api --profile api
+# 3. Launch the FastAPI REST API
+docker compose --profile api up api
 ```
 
 ## Running tests
 
 ```bash
 pytest tests/ -v
-# 19 passed
+# 45 passed  (19 transform + 26 API)
 ```
 
 ---
@@ -154,7 +186,8 @@ real-estate-etl/
 │   └── api.py          # FastAPI REST API
 ├── dashboard.py        # Streamlit interactive dashboard (+ CSV/Excel export)
 ├── tests/
-│   └── test_transform.py   # 19 unit tests
+│   ├── test_transform.py   # 19 ETL unit tests
+│   └── test_api.py         # 13 API endpoint tests
 ├── Dockerfile
 ├── docker-compose.yml
 ├── requirements.txt

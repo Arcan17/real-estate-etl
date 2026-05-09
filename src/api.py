@@ -148,3 +148,25 @@ def export_csv(comuna: str = Query(None), bedrooms: int = Query(None)):
         media_type="text/csv",
         headers={"Content-Disposition": f'attachment; filename="{filename}"'},
     )
+
+
+@app.get("/api/export/excel")
+def export_excel(comuna: str = Query(None), bedrooms: int = Query(None)):
+    """Download all listings as Excel (.xlsx)."""
+    df = _get_df()
+    if comuna:
+        df = df.filter(pl.col("comuna") == comuna)
+    if bedrooms is not None:
+        df = df.filter(pl.col("bedrooms") == bedrooms)
+
+    buf = io.BytesIO()
+    df.to_pandas().to_excel(buf, index=False, sheet_name="Listings")
+    buf.seek(0)
+
+    filename = f"listings{'_' + comuna if comuna else ''}.xlsx"
+    media = "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet"
+    return StreamingResponse(
+        buf,
+        media_type=media,
+        headers={"Content-Disposition": f'attachment; filename="{filename}"'},
+    )
