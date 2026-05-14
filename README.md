@@ -10,6 +10,9 @@
 ![Tests](https://img.shields.io/badge/tests-45%20passing-brightgreen?style=flat)
 ![CI](https://img.shields.io/github/actions/workflow/status/Arcan17/real-estate-etl/ci.yml?label=CI&logo=github)
 ![License](https://img.shields.io/badge/license-MIT-green?style=flat)
+![Live Demo](https://img.shields.io/badge/demo-live-brightgreen?style=flat)
+
+**🚀 [Live Demo](https://real-estate-etl-production.up.railway.app)**
 
 ---
 
@@ -281,7 +284,7 @@ Polars is significantly faster for columnar transformations, has a cleaner API w
 
 ## Roadmap
 
-- [ ] Deploy live demo (Render / Railway)
+- [x] Deploy live demo → [real-estate-etl-production.up.railway.app](https://real-estate-etl-production.up.railway.app)
 - [ ] Add incremental loading with listing ID deduplication
 - [ ] Track daily price history per listing
 - [ ] Add price drop alerts via Telegram
