@@ -12,10 +12,10 @@ RUN pip install --no-cache-dir -r requirements.txt
 
 COPY . .
 
+# Create data directory
+RUN mkdir -p data
+
 EXPOSE 8501
 
-# Default: run the Streamlit dashboard
-CMD ["streamlit", "run", "dashboard.py", \
-     "--server.port=8501", \
-     "--server.address=0.0.0.0", \
-     "--server.headless=true"]
+# start.sh: seeds demo data if DB missing, then launches Streamlit
+CMD ["bash", "start.sh"]
