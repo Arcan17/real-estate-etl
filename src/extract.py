@@ -9,7 +9,6 @@ import time
 import random
 import polars as pl
 from pathlib import Path
-from scrapling.fetchers import Fetcher
 
 from src.config import BASE_URL, MAX_PAGES, SCRAPE_DELAY_MIN, SCRAPE_DELAY_MAX
 
@@ -87,6 +86,12 @@ def _parse_card(card):
 
 def scrape_page(url: str) -> list[dict]:
     """Scrape one page of listings."""
+    try:
+        from scrapling.fetchers import Fetcher  # lazy import — scrapling is optional in CI
+    except ImportError as exc:  # noqa: F841
+        raise ImportError(
+            "scrapling is not installed. Run: pip install 'scrapling>=0.4'"
+        ) from exc
     page = Fetcher.get(url, stealthy_headers=True)
     cards = page.css(".ui-search-result__wrapper")
     results = []
