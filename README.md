@@ -174,6 +174,7 @@ uvicorn src.api:app --reload
 | `GET`  | `/api/comunas`              | All communes with avg price            |
 | `GET`  | `/api/prices/by-comuna`     | Avg price per commune                  |
 | `GET`  | `/api/prices/by-bedrooms`   | Avg price by bedroom count             |
+| `GET`  | `/api/data-quality`         | Dataset completeness and quality report |
 | `GET`  | `/api/export/csv`           | Download all listings as CSV           |
 | `GET`  | `/api/export/excel`         | Download all listings as Excel (.xlsx) |
 
@@ -181,8 +182,27 @@ uvicorn src.api:app --reload
 # Example queries
 curl "http://localhost:8000/api/summary"
 curl "http://localhost:8000/api/listings?comuna=Providencia&bedrooms=2&limit=20"
+curl "http://localhost:8000/api/data-quality"
 curl "http://localhost:8000/api/export/csv" -o listings.csv
 curl "http://localhost:8000/api/export/excel" -o listings.xlsx
+```
+
+### Data quality
+
+`GET /api/data-quality` returns a completeness and integrity report for the current dataset:
+
+```json
+{
+  "rows_total": 237,
+  "missing_bedrooms": 12,
+  "missing_bathrooms": 8,
+  "missing_sqm": 21,
+  "duplicate_urls": 0,
+  "min_price_clp": 224000,
+  "max_price_clp": 770000,
+  "avg_price_clp": 363214,
+  "generated_at": "2024-05-25T20:00:00+00:00"
+}
 ```
 
 <details>
@@ -273,24 +293,25 @@ Polars is significantly faster for columnar transformations, has a cleaner API w
 
 ---
 
-## Known Limitations
+## Current limitations
 
-- Scrapes **Santiago rental listings only** — other regions or sale listings would require selector updates
-- No incremental loading — each pipeline run replaces all data (no deduplication by listing ID yet)
-- No authentication on the REST API (read-only, public data — acceptable for portfolio use)
-- Portal Inmobiliario may update their HTML structure; selectors may need adjustment
+- **DOM dependency**: the scraper relies on Portal Inmobiliario's current CSS selectors — any redesign of the site will require selector updates
+- **Geography**: dataset covers Santiago rental listings only; other Chilean cities or sale listings would need additional configuration
+- **UF conversion**: price-to-UF conversion uses a static approximation hardcoded at pipeline run time; a production system should call the official CMF/SII UF API for the exact daily value
+- **No incremental loading**: each pipeline run replaces all data (no deduplication by listing ID)
+- **No authentication**: the REST API is read-only over public data, acceptable for portfolio use
 
 ---
 
-## Roadmap
+## Production roadmap
 
-- [x] Deploy live demo → [real-estate-etl-production.up.railway.app](https://real-estate-etl-production.up.railway.app)
-- [ ] Add incremental loading with listing ID deduplication
-- [ ] Track daily price history per listing
-- [ ] Add price drop alerts via Telegram
-- [ ] Extend to sale listings and other Chilean cities
-- [ ] Add commune-level price heatmap
-- [ ] Schedule daily pipeline runs with APScheduler or cron
+- Scheduled ingestion (APScheduler or cron) with configurable run interval
+- Historical price snapshots: store each run with timestamp for trend analysis
+- Configurable commune and property-type targets via environment variables
+- Real UF conversion via CMF/SII API instead of static approximation
+- Monitoring and alerting for scrape failures (Telegram or email)
+- Retry/backoff strategy with proxy rotation for long-running scrapes
+- Incremental loading with listing-ID deduplication to avoid data churn
 
 ---
 

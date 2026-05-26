@@ -3,17 +3,13 @@ Unit tests for the FastAPI REST API endpoints.
 Uses a temporary DuckDB populated with sample listings so no live scrape is needed.
 """
 
-import sys
-import os
+import importlib
 import tempfile
 from pathlib import Path
 
 import pytest
-import polars as pl
 import duckdb
 from fastapi.testclient import TestClient
-
-sys.path.insert(0, os.path.join(os.path.dirname(__file__), "..", "src"))
 
 
 # ── Fixtures ──────────────────────────────────────────────────────────────────
@@ -133,12 +129,11 @@ def tmp_db():
 @pytest.fixture(scope="module")
 def client(tmp_db, monkeypatch_module):
     """TestClient with DB_PATH patched to the temp database."""
-    import load
+    import src.load as load_mod
 
-    monkeypatch_module.setattr(load, "DB_PATH", tmp_db)
+    monkeypatch_module.setattr(load_mod, "DB_PATH", tmp_db)
 
-    import importlib
-    import api as api_mod
+    import src.api as api_mod
 
     importlib.reload(api_mod)
 
@@ -260,6 +255,21 @@ def test_listings_pagination_offset(client):
     assert len(data["results"]) == 1
 
 
+def test_listings_invalid_limit_zero(client):
+    r = client.get("/api/listings?limit=0")
+    assert r.status_code == 422
+
+
+def test_listings_invalid_limit_too_large(client):
+    r = client.get("/api/listings?limit=501")
+    assert r.status_code == 422
+
+
+def test_listings_invalid_offset_negative(client):
+    r = client.get("/api/listings?offset=-1")
+    assert r.status_code == 422
+
+
 # ── Comunas ───────────────────────────────────────────────────────────────────
 
 
@@ -291,6 +301,65 @@ def test_prices_by_bedrooms_sorted(client):
     r = client.get("/api/prices/by-bedrooms")
     bedrooms = [row["bedrooms"] for row in r.json()]
     assert bedrooms == sorted(bedrooms)
+
+
+# ── Data quality ──────────────────────────────────────────────────────────────
+
+
+def test_data_quality_returns_200(client):
+    r = client.get("/api/data-quality")
+    assert r.status_code == 200
+
+
+def test_data_quality_has_required_fields(client):
+    r = client.get("/api/data-quality")
+    data = r.json()
+    required = {
+        "rows_total",
+        "missing_bedrooms",
+        "missing_bathrooms",
+        "missing_sqm",
+        "duplicate_urls",
+        "min_price_clp",
+        "max_price_clp",
+        "avg_price_clp",
+        "generated_at",
+    }
+    assert required.issubset(data.keys())
+
+
+def test_data_quality_rows_total(client):
+    r = client.get("/api/data-quality")
+    assert r.json()["rows_total"] == 5
+
+
+def test_data_quality_no_missing_in_sample(client):
+    r = client.get("/api/data-quality")
+    data = r.json()
+    assert data["missing_bedrooms"] == 0
+    assert data["missing_bathrooms"] == 0
+    assert data["missing_sqm"] == 0
+
+
+def test_data_quality_no_duplicate_urls(client):
+    r = client.get("/api/data-quality")
+    assert r.json()["duplicate_urls"] == 0
+
+
+def test_data_quality_price_range(client):
+    r = client.get("/api/data-quality")
+    data = r.json()
+    assert data["min_price_clp"] == 280000.0
+    assert data["max_price_clp"] == 900000.0
+
+
+def test_data_quality_generated_at_is_iso(client):
+    r = client.get("/api/data-quality")
+    from datetime import datetime
+
+    ts = r.json()["generated_at"]
+    # Should parse without error
+    datetime.fromisoformat(ts)
 
 
 # ── CSV export ────────────────────────────────────────────────────────────────

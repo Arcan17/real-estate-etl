@@ -11,11 +11,10 @@ import polars as pl
 from pathlib import Path
 from scrapling.fetchers import Fetcher
 
+from src.config import BASE_URL, MAX_PAGES, SCRAPE_DELAY_MIN, SCRAPE_DELAY_MAX
+
 RAW_DIR = Path(__file__).parent.parent / "data" / "raw"
 RAW_FILE = RAW_DIR / "listings_raw.csv"
-
-BASE_URL = "https://www.portalinmobiliario.com/arriendo/departamento/santiago-metropolitana"
-MAX_PAGES = 5  # ~240 listings per run (48 per page)
 
 
 def _parse_card(card):
@@ -114,7 +113,7 @@ def scrape(max_pages: int = MAX_PAGES, force: bool = False) -> pl.DataFrame:
         rows = scrape_page(url)
         all_rows.extend(rows)
         if page_num < max_pages - 1:
-            time.sleep(random.uniform(1.5, 3.0))  # polite delay
+            time.sleep(random.uniform(SCRAPE_DELAY_MIN, SCRAPE_DELAY_MAX))  # polite delay
 
     df = pl.DataFrame(all_rows)
     df.write_csv(RAW_FILE)

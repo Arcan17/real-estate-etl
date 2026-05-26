@@ -4,18 +4,15 @@ Run: uvicorn src.api:app --reload
 """
 
 import io
-import sys
-import os
-
-sys.path.insert(0, os.path.dirname(__file__))
+from datetime import datetime, timezone
 
 from fastapi import FastAPI, HTTPException, Query
-from fastapi.responses import StreamingResponse
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import StreamingResponse
 import polars as pl
-import duckdb
 
-from load import DB_PATH, get_connection
+from src.config import CORS_ORIGINS
+from src.load import DB_PATH, get_connection
 
 app = FastAPI(
     title="Real Estate ETL API — Santiago, Chile",
@@ -25,7 +22,7 @@ app = FastAPI(
 
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["*"],
+    allow_origins=CORS_ORIGINS,
     allow_methods=["*"],
     allow_headers=["*"],
 )
@@ -33,7 +30,7 @@ app.add_middleware(
 
 def _get_df() -> pl.DataFrame:
     if not DB_PATH.exists():
-        raise HTTPException(status_code=503, detail="No data. Run `python src/main.py` first.")
+        raise HTTPException(status_code=503, detail="No data. Run `python -m src.main` first.")
     con = get_connection(DB_PATH)
     return pl.from_arrow(con.execute("SELECT * FROM listings").arrow())
 
@@ -52,8 +49,8 @@ def get_listings(
     min_price: float = Query(None, description="Minimum price CLP"),
     max_price: float = Query(None, description="Maximum price CLP"),
     bedrooms: int = Query(None, description="Number of bedrooms"),
-    limit: int = Query(100, le=500),
-    offset: int = Query(0),
+    limit: int = Query(100, ge=1, le=500, description="Results per page (1–500)"),
+    offset: int = Query(0, ge=0, description="Pagination offset"),
 ):
     """Return paginated listings with optional filters."""
     df = _get_df()
@@ -136,6 +133,23 @@ def prices_by_bedrooms():
         .sort("bedrooms")
     )
     return result.to_dicts()
+
+
+@app.get("/api/data-quality")
+def data_quality():
+    """Dataset quality report: completeness, duplicates and price range."""
+    df = _get_df()
+    return {
+        "rows_total": len(df),
+        "missing_bedrooms": df["bedrooms"].null_count(),
+        "missing_bathrooms": df["bathrooms"].null_count(),
+        "missing_sqm": df["sqm"].null_count(),
+        "duplicate_urls": len(df) - df["url"].n_unique(),
+        "min_price_clp": df["price_clp"].min(),
+        "max_price_clp": df["price_clp"].max(),
+        "avg_price_clp": round(df["price_clp"].mean(), 0),
+        "generated_at": datetime.now(timezone.utc).isoformat(),
+    }
 
 
 @app.get("/api/export/csv")

@@ -10,10 +10,7 @@ sys.path.insert(0, os.path.join(os.path.dirname(__file__), "src"))
 
 import streamlit as st
 import plotly.express as px
-import plotly.graph_objects as go
 import polars as pl
-import duckdb
-from pathlib import Path
 
 from load import DB_PATH, get_connection
 

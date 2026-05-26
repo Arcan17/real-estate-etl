@@ -10,9 +10,7 @@ import os
 
 sys.path.insert(0, os.path.join(os.path.dirname(__file__), ".."))
 
-import duckdb
 import polars as pl
-from pathlib import Path
 from src.load import DB_PATH, get_connection, create_schema
 
 random.seed(42)

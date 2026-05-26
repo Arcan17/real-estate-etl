@@ -3,16 +3,12 @@ Orchestrates the full ETL pipeline:
   Extract → Transform → Load → Analytics
 """
 
-import sys
-import os
 from pathlib import Path
 
-sys.path.insert(0, os.path.dirname(__file__))
-
-from extract import download_data, RAW_FILE
-from transform import load_raw, clean, save_parquet
-from load import load_pipeline, DB_PATH
-from analytics import print_report
+from src.extract import download_data, RAW_FILE
+from src.transform import load_raw, clean, save_parquet
+from src.load import load_pipeline, DB_PATH
+from src.analytics import print_report
 
 PROCESSED_FILE = Path(__file__).parent.parent / "data" / "processed" / "listings_clean.parquet"
 
