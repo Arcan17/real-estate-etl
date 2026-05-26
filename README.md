@@ -48,7 +48,7 @@ One command fetches ~240 live listings, transforms them into structured market i
 - **Interactive dashboard**: filters by commune, bedrooms, price range — with Plotly charts and clickable property links
 - **One-click export**: CSV and Excel (.xlsx) from dashboard and REST API
 - **FastAPI REST API**: paginated listings, summary stats, per-commune analytics, file export
-- **45 passing tests**: 19 ETL unit tests + 26 API endpoint tests
+- **pytest suite**: ETL unit tests + API endpoint tests (including data-quality and Query validation)
 - **Docker Compose**: pipeline, dashboard, and API as separate services
 - **GitHub Actions CI/CD**: runs on every push
 
@@ -111,7 +111,7 @@ Portal Inmobiliario (live)
 | REST API         | FastAPI + Uvicorn                       |
 | Export           | openpyxl (Excel), csv (stdlib)          |
 | Containerization | Docker + Docker Compose                 |
-| Testing          | pytest — 45 tests                       |
+| Testing          | pytest suite                            |
 | CI/CD            | GitHub Actions                          |
 
 ---
@@ -128,7 +128,7 @@ source .venv/bin/activate      # Windows: .venv\Scripts\activate
 pip install -r requirements.txt
 
 # 2. Run the ETL pipeline (scrapes live data — takes ~30 seconds)
-python src/main.py
+python -m src.main
 
 # 3. Launch the dashboard
 streamlit run dashboard.py
@@ -241,14 +241,14 @@ docker compose --profile api up api
 ## Running Tests
 
 ```bash
-pytest tests/ -v
+pytest tests/ -v --tb=short
 ```
 
 ```
-tests/test_transform.py   19 passed   ← ETL transformation logic
-tests/test_api.py         26 passed   ← API endpoints and filters
+tests/test_transform.py   ← ETL transformation logic
+tests/test_api.py         ← API endpoints, filters, data-quality, Query validation
 ─────────────────────────────────────
-45 passed in 0.8s
+55 passed
 ```
 
 ---
@@ -266,8 +266,8 @@ real-estate-etl/
 │   └── api.py            # FastAPI REST API
 ├── dashboard.py          # Streamlit interactive dashboard
 ├── tests/
-│   ├── test_transform.py # 19 ETL unit tests
-│   └── test_api.py       # 26 API endpoint tests
+│   ├── test_transform.py # ETL unit tests
+│   └── test_api.py       # API endpoint tests
 ├── docs/
 │   └── screenshots/
 ├── data/                 # DuckDB database (gitignored)
