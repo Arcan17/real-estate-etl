@@ -40,6 +40,20 @@ One command fetches ~240 live listings, transforms them into structured market i
 
 ---
 
+## What it demonstrates
+
+| Capability | Implementation | Detail |
+|---|---|---|
+| **Web scraping (anti-bot)** | Scrapling | Adaptive selectors, browser fingerprinting bypass |
+| **High-performance ETL** | Polars | Lazy evaluation, typed schema, fast transforms |
+| **Analytical SQL layer** | DuckDB | In-process OLAP queries, no server needed |
+| **REST API** | FastAPI | Paginated listings, summary stats, per-commune analytics |
+| **Interactive dashboard** | Streamlit + Plotly | Filters, charts, clickable listings |
+| **Export pipeline** | CSV + Excel (.xlsx) | From both dashboard and REST endpoints |
+| **CI/CD + testing** | GitHub Actions + pytest | 45 tests, zero real scraping in CI |
+
+---
+
 ## Features
 
 - **Live scraping** of ~240 property listings with Scrapling (anti-bot fingerprinting, adaptive selectors)
